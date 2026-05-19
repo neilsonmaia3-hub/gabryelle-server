@@ -3,7 +3,7 @@ services:
     name: gabryelle-server
     env: node
     buildCommand: npm install && npx puppeteer browsers install chrome
-    startCommand: node server.js
+    startCommand: node server.cjs
     envVars:
       - key: NODE_ENV
         value: production
