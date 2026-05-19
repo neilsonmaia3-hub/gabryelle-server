@@ -1,6 +1,8 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
 const cors = require('cors');
+const fs = require('fs');
+const { execSync } = require('child_process');
 
 const app = express();
 app.use(cors());
@@ -21,8 +23,22 @@ app.post('/gerar-slides', async (req, res) => {
 
   let browser;
   try {
+    // Instala Chrome no diretório do projeto se não existir
+    const chromeDir = '/opt/render/project/src/.chrome';
+    const chromePath = `${chromeDir}/chrome/linux-121.0.6167.85/chrome-linux64/chrome`;
+
+    if (!fs.existsSync(chromePath)) {
+      console.log('Chrome não encontrado, instalando...');
+      execSync('npx puppeteer browsers install chrome', {
+        env: { ...process.env, PUPPETEER_CACHE_DIR: chromeDir },
+        stdio: 'inherit'
+      });
+      console.log('Chrome instalado com sucesso!');
+    }
+
     browser = await puppeteer.launch({
       headless: 'new',
+      executablePath: chromePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -71,7 +87,6 @@ app.post('/gerar-slides', async (req, res) => {
 // ── Builder HTML de cada slide (1080x1080 real) ───────────────────────────
 function buildSlideHTML(slide, idx, total, logoGold, logoDark, fotoUrl, bgImageUrl) {
   const tipo = slide.tipo;
-  const hasPhoto = fotoUrl || bgImageUrl;
   const mainBg = fotoUrl || bgImageUrl || null;
   const contentBg = bgImageUrl || null;
 
@@ -184,3 +199,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✓ Servidor rodando na porta ${PORT}`);
 });
+
