@@ -5,7 +5,7 @@
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js",
+    "start": "node servidor.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
