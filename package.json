@@ -2,10 +2,10 @@
   "name": "gabryelle-server",
   "version": "1.0.0",
   "description": "Servidor de geração de slides PNG para Estúdio Gabryelle",
-  "main": "server.js",
+  "main": "server.cjs",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js",
+    "start": "node server.cjs",
     "dev": "nodemon servidor.js"
   },
   "dependencies": {
