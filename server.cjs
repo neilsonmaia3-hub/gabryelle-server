@@ -8,6 +8,16 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
+// ── Converte URL do Google Drive para URL direta ──────────────────────────
+function convertDriveUrl(url) {
+  if (!url) return url;
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) {
+    return `https://lh3.googleusercontent.com/d/${match[1]}`;
+  }
+  return url;
+}
+
 // ── Health check ──────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'Estúdio Gabryelle · Gerador de Slides' });
@@ -21,9 +31,12 @@ app.post('/gerar-slides', async (req, res) => {
     return res.status(400).json({ erro: 'Slides não fornecidos.' });
   }
 
+  // Converte URLs do Google Drive
+  const fotoUrlConvertida = convertDriveUrl(fotoUrl);
+  const bgImageUrlConvertida = convertDriveUrl(bgImageUrl);
+
   let browser;
   try {
-    // Instala Chrome no diretório do projeto se não existir
     const chromeDir = '/opt/render/project/src/.chrome';
     const chromePath = `${chromeDir}/chrome/linux-121.0.6167.85/chrome-linux64/chrome`;
 
@@ -54,15 +67,14 @@ app.post('/gerar-slides', async (req, res) => {
 
     for (let i = 0; i < slides.length; i++) {
       const slide = slides[i];
-      const html = buildSlideHTML(slide, i, slides.length, logoGold, logoDark, fotoUrl, bgImageUrl);
+      const html = buildSlideHTML(slide, i, slides.length, logoGold, logoDark, fotoUrlConvertida, bgImageUrlConvertida);
 
       const page = await browser.newPage();
       await page.setViewport({ width: 1080, height: 1080, deviceScaleFactor: 1 });
-      await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+      await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
 
-      // Aguardar fontes e imagens
       await page.evaluateHandle('document.fonts.ready');
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 1000));
 
       const screenshot = await page.screenshot({
         type: 'png',
@@ -84,7 +96,7 @@ app.post('/gerar-slides', async (req, res) => {
   }
 });
 
-// ── Builder HTML de cada slide (1080x1080 real) ───────────────────────────
+// ── Builder HTML ──────────────────────────────────────────────────────────
 function buildSlideHTML(slide, idx, total, logoGold, logoDark, fotoUrl, bgImageUrl) {
   const tipo = slide.tipo;
   const mainBg = fotoUrl || bgImageUrl || null;
@@ -95,7 +107,6 @@ function buildSlideHTML(slide, idx, total, logoGold, logoDark, fotoUrl, bgImageU
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { width: 1080px; height: 1080px; overflow: hidden; }
     .slide { width: 1080px; height: 1080px; position: relative; font-family: 'Montserrat', sans-serif; }
-    .serif { font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; }
   `;
 
   if (tipo === 'capa') {
@@ -105,10 +116,7 @@ function buildSlideHTML(slide, idx, total, logoGold, logoDark, fotoUrl, bgImageU
         display: flex; flex-direction: column; justify-content: space-between;
         padding: 64px 72px;
       }
-      .overlay {
-        position: absolute; inset: 0;
-        background: linear-gradient(165deg, rgba(44,36,32,.4) 0%, rgba(44,36,32,.95) 100%);
-      }
+      .overlay { position: absolute; inset: 0; background: linear-gradient(165deg, rgba(44,36,32,.4) 0%, rgba(44,36,32,.95) 100%); }
       .top { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: flex-start; }
       .logo { height: 52px; object-fit: contain; }
       .handle { font-size: 18px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: #CDA162; }
@@ -138,12 +146,7 @@ function buildSlideHTML(slide, idx, total, logoGold, logoDark, fotoUrl, bgImageU
 
   if (tipo === 'cta') {
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>${baseStyle}
-      .slide {
-        background: linear-gradient(155deg, #2C2420, #1a1410);
-        display: flex; flex-direction: column; align-items: center;
-        justify-content: center; text-align: center; padding: 80px;
-        gap: 32px;
-      }
+      .slide { background: linear-gradient(155deg, #2C2420, #1a1410); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 80px; gap: 32px; }
       .logo { height: 80px; object-fit: contain; }
       .titulo { font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 56px; line-height: 1.25; color: #F5EFE0; max-width: 800px; }
       .corpo { font-size: 28px; color: #C4B49E; line-height: 1.65; max-width: 720px; }
@@ -162,11 +165,8 @@ function buildSlideHTML(slide, idx, total, logoGold, logoDark, fotoUrl, bgImageU
     </body></html>`;
   }
 
-  // conteudo / destaque
   const isD = tipo === 'destaque';
-  const bgStyle = contentBg
-    ? `background: url('${contentBg}') center / cover no-repeat;`
-    : `background: #F0EAE0;`;
+  const bgStyle = contentBg ? `background: url('${contentBg}') center / cover no-repeat;` : `background: #F0EAE0;`;
   const overlayOpacity = contentBg ? '0.93' : '0';
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>${baseStyle}
@@ -194,9 +194,9 @@ function buildSlideHTML(slide, idx, total, logoGold, logoDark, fotoUrl, bgImageU
   </body></html>`;
 }
 
-// ── Start ─────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✓ Servidor rodando na porta ${PORT}`);
 });
+
 
